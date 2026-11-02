@@ -1,15 +1,12 @@
 @echo off
 cd /d "%~dp0"
 
-:: Check for admin privileges
 net session >nul 2>&1
 if %errorLevel% neq 0 (
-    echo.
     echo ========================================================
     echo  Access denied.
     echo  Please run this script as Administrator.
     echo ========================================================
-    echo.
     pause
     exit /b
 )

@@ -1,5 +1,8 @@
 # Local configurations (contains personal device MAC address)
 config.json
 
+# Test dir
+/screenshots
+
 # Build / ZIP archives
 *.zip

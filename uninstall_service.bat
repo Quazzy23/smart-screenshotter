@@ -1,0 +1,27 @@
+@echo off
+cd /d "%~dp0"
+
+:: Check for admin privileges
+net session >nul 2>&1
+if %errorLevel% neq 0 (
+    echo.
+    echo ========================================================
+    echo  Access denied.
+    echo  Please run this script as Administrator.
+    echo ========================================================
+    echo.
+    pause
+    exit /b
+)
+
+echo Stopping and removing Smart-Screenshotter Task...
+schtasks /end /tn "SmartScreenshotterService" >nul 2>&1
+schtasks /delete /tn "SmartScreenshotterService" /f >nul 2>&1
+
+powershell -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*main.py*' } | Stop-Process -Force" >nul 2>&1
+
+echo.
+echo ========================================================
+echo SUCCESS! Task completely removed from Windows.
+echo ========================================================
+pause

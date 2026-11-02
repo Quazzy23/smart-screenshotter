@@ -20,10 +20,11 @@
 Download the latest `.zip` from [Releases](https://github.com/Quazzy23/Smart-Screenshotter/releases), or clone the repo.
 
 ### 2. Install & Configure
-Run **`install_service.bat` as Administrator**. 
-* The script installs dependencies (`keyboard`, `Pillow`).
+Run **`install_service.bat`** as Administrator. 
 * Enter your desired save path (e.g., `D:\Pictures\Screenshots`).
 * The task is registered and started automatically.
+* Verify execution via `taskschd.msc` (ensure `SmartScreenshotterService` state is **Running**).
+* *To pause the service, select "End" or "Disable".*
 
 ### 3. Usage
 Press **`Print Screen`**. The screenshot is instantly saved to your folder.

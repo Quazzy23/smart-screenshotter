@@ -5,4 +5,5 @@ config.json
 /screenshots
 
 # Build / ZIP archives
+build_release.py
 *.zip

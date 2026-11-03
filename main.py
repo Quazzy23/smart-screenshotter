@@ -6,7 +6,7 @@ from datetime import datetime
 from PyQt6.QtWidgets import QApplication, QWidget
 from PyQt6.QtCore import Qt, QRect, QPoint, QTimer, QPropertyAnimation, QEasingCurve
 from PyQt6.QtGui import QGuiApplication, QColor, QPainter, QPen
-import keyboard
+from pynput import keyboard
 
 # ==========================================
 # НАСТРОЙКИ
@@ -17,16 +17,12 @@ SAVE_DELAY = 250
 HOTKEY_FULLSCREEN = 'print screen'
 HOTKEY_AREA = 'alt+print screen'
 CONFIG_FILE = "config.json"
-
-# Формат имени файла (без расширения)
-# %Y-%m-%d_%H-%M-%S = Год-Месяц-День_Часы-Минуты-Секунды
-FILENAME_FORMAT = "%Y-%m-%d_%H-%M-%S" 
+FILENAME_FORMAT = "%Y-%m-%d_%H-%M-%S"
 # ==========================================
 
 def get_save_path():
     base_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
     config_path = os.path.join(base_dir, CONFIG_FILE)
-    
     if not os.path.exists(config_path):
         print(f"Error: '{CONFIG_FILE}' not found! Run install_service.bat")
         return None
@@ -44,7 +40,6 @@ class FlashOverlay(QWidget):
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        
         screen = QGuiApplication.primaryScreen()
         self.setGeometry(screen.geometry())
 
@@ -71,38 +66,31 @@ class FlashOverlay(QWidget):
     def flash(self, pixmap, save_dir):
         self.pixmap_to_save = pixmap
         self.save_dir = save_dir
-
         self.setWindowOpacity(0.0)
         self.showFullScreen()
-        
         self.anim_in.stop()
         self.anim_in.start()
-        
         try:
             self.anim_in.finished.disconnect(self.on_fully_dark)
         except TypeError:
             pass
         self.anim_in.finished.connect(self.on_fully_dark)
-        
+
     def on_fully_dark(self):
         self.anim_out.stop()
         self.anim_out.start()
-
         if self.pixmap_to_save:
             pixmap = self.pixmap_to_save
             save_dir = self.save_dir
             self.pixmap_to_save = None 
-            
             def save_worker():
                 now = datetime.now()
                 filename = now.strftime(FILENAME_FORMAT) + ".png"
                 filepath = os.path.join(save_dir, filename)
-                
                 if pixmap.save(filepath):
                     print(f"Screenshot saved: full screen -> {filename}")
                 else:
                     print(f"Error saving screenshot to {filepath}")
-            
             QTimer.singleShot(SAVE_DELAY, lambda: threading.Thread(target=save_worker, daemon=True).start())
 
 # --- КЛАСС ДЛЯ ВЫДЕЛЕНИЯ ОБЛАСТИ ---
@@ -113,7 +101,6 @@ class SnippingOverlay(QWidget):
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setCursor(Qt.CursorShape.CrossCursor)
-        
         self.original_pixmap = None
         self.dark_pixmap = None
         self.origin = QPoint()
@@ -129,7 +116,6 @@ class SnippingOverlay(QWidget):
         self.anim_in.setDuration(FADE_DURATION)
         self.anim_in.setStartValue(0.0)
         self.anim_in.setEndValue(1.0)
-        
         self.anim_out = QPropertyAnimation(self, b"windowOpacity")
         self.anim_out.setDuration(FADE_DURATION)
         self.anim_out.setStartValue(1.0)
@@ -155,6 +141,12 @@ class SnippingOverlay(QWidget):
         
         self.setWindowOpacity(0.0)
         self.showFullScreen()
+        
+        # --- ДОБАВИТЬ ВОТ ЭТИ ДВЕ СТРОКИ ---
+        self.activateWindow()  # Активируем окно
+        self.setFocus()        # Ставим фокус на него
+        # -----------------------------------
+        
         self.anim_in.stop()
         self.anim_in.start()
 
@@ -170,25 +162,19 @@ class SnippingOverlay(QWidget):
     def paintEvent(self, event):
         if not self.dark_pixmap:
             return
-
         painter = QPainter(self)
         painter.drawPixmap(0, 0, self.dark_pixmap)
-        
         if self.is_drawing:
             rect = QRect(self.origin, self.current_pos).normalized()
-            
             if rect.width() > 20 and rect.height() > 20:
                 painter.drawPixmap(rect, self.original_pixmap, rect)
-            
             pen = QPen(Qt.GlobalColor.white, 1, Qt.PenStyle.CustomDashLine)
             pen.setDashPattern([4, 4])
             pen.setCapStyle(Qt.PenCapStyle.FlatCap)
             painter.setPen(pen)
             painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
-            
             x1, y1 = rect.left(), rect.top()
             x2, y2 = rect.right(), rect.bottom()
-            
             painter.drawLine(x1, y1, x2, y1)
             painter.drawLine(x2, y1, x2, y2)
             painter.drawLine(x1, y2, x2, y2)
@@ -211,21 +197,17 @@ class SnippingOverlay(QWidget):
             self.is_drawing = False
             rect = QRect(self.origin, self.current_pos).normalized()
             self.start_fade_out()
-            
             if rect.width() > 5 and rect.height() > 5 and self.original_pixmap:
                 cropped = self.original_pixmap.copy(rect)
                 save_dir = self.save_dir
-                
                 def save_worker():
                     now = datetime.now()
                     filename = now.strftime(FILENAME_FORMAT) + ".png"
                     filepath = os.path.join(save_dir, filename)
-                    
                     if cropped.save(filepath):
                         print(f"Screenshot saved: area {rect.width()}x{rect.height()} at ({rect.x()}, {rect.y()})")
                     else:
                         print(f"Error saving screenshot to {filepath}")
-                
                 QTimer.singleShot(SAVE_DELAY, lambda: threading.Thread(target=save_worker, daemon=True).start())
 
     def keyPressEvent(self, event):
@@ -237,7 +219,6 @@ if __name__ == "__main__":
     save_dir = get_save_path()
     if not save_dir:
         sys.exit(1)
-
     if not os.path.exists(save_dir):
         try:
             os.makedirs(save_dir)
@@ -246,18 +227,40 @@ if __name__ == "__main__":
             sys.exit(1)
 
     app = QApplication(sys.argv)
-    
     flash_overlay = FlashOverlay()
     snip_overlay = SnippingOverlay(save_dir)
-
     trigger_flash = [False]
     trigger_snip = [False]
 
-    def on_fullscreen():
-        trigger_flash[0] = True
+    # --- НОВЫЙ ПЕРЕХВАТ ЧЕРЕЗ PYNPUT ---
+    # Мы используем "горячие клавиши" для комбинаций и отдельный слушатель для одиночных нажатий
+    current_keys = set()
 
-    keyboard.add_hotkey(HOTKEY_FULLSCREEN, on_fullscreen)
-    keyboard.add_hotkey(HOTKEY_AREA, lambda: trigger_snip.__setitem__(0, True))
+    def on_press(key):
+        # Добавляем нажатую клавишу в список
+        current_keys.add(key)
+        
+        # Проверяем, не нажата ли звездочка (Numpad), чтобы игнорировать её
+        # В pynput звездочка Numpad обычно приходит как KeyCode с vk=106
+        if hasattr(key, 'vk') and key.vk == 106:
+            return
+
+        # Проверяем Print Screen (одиночный)
+        if key == keyboard.Key.print_screen:
+            # Если зажат Alt — это область
+            if keyboard.Key.alt in current_keys or keyboard.Key.alt_l in current_keys or keyboard.Key.alt_r in current_keys:
+                trigger_snip[0] = True
+            else:
+                trigger_flash[0] = True
+
+    def on_release(key):
+        # Убираем клавишу из списка при отпускании
+        if key in current_keys:
+            current_keys.remove(key)
+
+    # Запускаем слушатель в отдельном потоке
+    listener = keyboard.Listener(on_press=on_press, on_release=on_release)
+    listener.start()
 
     def check_triggers():
         if trigger_flash[0]:
@@ -265,11 +268,9 @@ if __name__ == "__main__":
             screen = QGuiApplication.primaryScreen()
             pixmap = screen.grabWindow(0)
             flash_overlay.flash(pixmap, save_dir)
-            
         if trigger_snip[0]:
             trigger_snip[0] = False
             snip_overlay.show_animated()
-            
         QTimer.singleShot(50, check_triggers)
 
     check_triggers()
